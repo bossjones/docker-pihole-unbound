@@ -1,3 +1,5 @@
-.env
+# .env
 .DS_Store
 .idea
+.envrc
+.claude/settings.local.json

@@ -1,0 +1,74 @@
+---
+services:
+  pihole-unbound:
+    container_name: pihole-unbound
+    image: mpgirro/pihole-unbound:2025.11.1
+    hostname: ${HOSTNAME}
+    domainname: ${DOMAIN_NAME}
+    ports:
+      - 443:443/tcp
+      - 53:53/tcp
+      - 53:53/udp
+      - ${PIHOLE_WEBPORT:-80}:80/tcp #Allows use of different port to access pihole web interface when other docker containers use port 80
+      - 5335:5335/tcp # Uncomment to enable unbound access on local server
+      # - 22/tcp # Uncomment to enable SSH
+    cap_add:
+      - NET_ADMIN
+      - CAP_SYS_NICE
+    # cap_add:
+    #   - NET_BIND_SERVICE # To allow binding to ports < 1024 (e.g., DNS port 53)
+    #   - NET_RAW # To handle raw sockets needed for DHCPv6 and IP verification
+    #   - NET_ADMIN # To modify routing tables and network operations
+    #   - SYS_NICE # To set higher priority for FTL process
+    #   - CHOWN # To change ownership of files if needed
+    #   - SYS_TIME # To set system time if required by FTL
+    environment:
+      # Basic configuration
+      - TZ=${TZ:-UTC}
+      - FTLCONF_webserver_api_password=${WEBPASSWORD}
+      - FTLCONF_webserver_interface_theme=${WEBTHEME:-default-light}
+      - FTLCONF_webserver_port=${PIHOLE_WEBPORT}
+
+      # DNS configuration - Use Unbound as upstream resolver
+      - FTLCONF_dns_upstreams=127.0.0.1#5335
+      - FTLCONF_dns_dnssec="true"
+
+      # DNS listening mode (single is recommended for Docker networking)
+      - FTLCONF_dns_listeningMode=single
+
+      # Reverse DNS configuration for local network hostname resolution
+      - FTLCONF_dns_revServers=${REV_SERVER:-false},${REV_SERVER_CIDR},${REV_SERVER_TARGET},${REV_SERVER_DOMAIN}
+
+      # Force Pi-hole to use this IP when replying to DNS A queries for pi.hole and hostname
+      - FTLCONF_REPLY_ADDR4=${SERVER_IP}
+
+      # Set the local IPv4 address for pi.hole hostname resolution
+      - FTLCONF_LOCAL_IPV4=${SERVER_IP}
+
+      # Rate limiting to prevent DNS query abuse (queries/seconds)
+      - FTLCONF_RATE_LIMIT=${RATE_LIMIT}
+
+      # Allow all socket connections (needed for some Docker networking scenarios)
+      - FTLCONF_SOCKET_LISTENING=all
+
+      # Enable FTL log tailing for real-time log viewing
+      - FTLCONF_TAIL_FTL_LOG=1
+
+      # Pi-hole verbosity level (higher = more detailed logging)
+      - PH_VERBOSE=${VERBOSE_LEVEL}
+
+      # Debug logging flags (useful for troubleshooting)
+      - FTLCONF_DEBUG_ALL=${DEBUG_ALL}
+      - FTLCONF_DEBUG_DATABASE=${DEBUG_DATABASE}
+      - FTLCONF_DEBUG_NETWORKING=${DEBUG_NETWORKING}
+      - FTLCONF_DEBUG_EDNS0=${DEBUG_EDNS0}
+      - FTLCONF_DEBUG_QUERIES=${DEBUG_QUERIES}
+      - FTLCONF_DEBUG_CAPS=${DEBUG_CAPS}
+    volumes:
+      - etc_pihole-unbound:/etc/pihole:rw
+      - etc_pihole_dnsmasq-unbound:/etc/dnsmasq.d:rw
+    restart: unless-stopped
+
+volumes:
+  etc_pihole-unbound:
+  etc_pihole_dnsmasq-unbound:
